@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Aplikasi Siswa</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="style.css?v=20260409q">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js?v=20260408a"></script>
+  <script src="supabase-firestore-compat.js?v=20260408a"></script>
+
+  <script>
+    function toggleDark() {
+      document.body.classList.toggle("dark");
+      localStorage.setItem("darkMode", document.body.classList.contains("dark"));
+    }
+
+    if (localStorage.getItem("darkMode") === "true") {
+      document.body.classList.add("dark");
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+</head>
+
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-mark">DS</span>
+        <div class="sidebar-brand-copy">
+          <button class="sidebar-brand-title" onclick="renderHome()">Dashboard Sekolah</button>
+          <div class="sidebar-brand-meta">
+            <small id="sidebarSemesterInfo">Semester aktif</small>
+            <div id="sidebarRoleInfo" class="sidebar-role-line">Role</div>
+          </div>
+        </div>
+      </div>
+      <button class="icon-btn mobile-only" onclick="toggleSidebar()" aria-label="Tutup sidebar">X</button>
+    </div>
+
+    <div class="sidebar-quick-actions">
+      <button class="topbar-btn" onclick="toggleDark()">Mode</button>
+      <button class="topbar-btn topbar-btn-strong" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="sidebar-section-label">Navigasi</div>
+
+    <div class="menu-group role-menu role-admin" id="menuAdmin">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuAdmin', this)">
+        <span>Admin</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu" id="submenuAdmin">
+        <button onclick="loadPage('admin-user')">User</button>
+        <button onclick="loadPage('admin-hierarki')">Pengguna Hierarki</button>
+        <button onclick="loadPage('admin-semester')">Semester</button>
+        <button onclick="loadPage('admin-rapor')">Rapor</button>
+        <button onclick="loadPage('admin-backup')">Backup & Restore</button>
+      </div>
+    </div>
+
+    <div class="menu-group role-menu role-admin role-urusan" id="menuGuru">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuGuru', this)">
+        <span>Data Guru</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu" id="submenuGuru">
+        <button onclick="loadPage('guru-input')">Input Guru</button>
+        <button onclick="loadPage('guru-lihat')">Lihat Guru</button>
+      </div>
+    </div>
+
+    <div class="menu-group role-menu role-admin" id="menuSiswaAdmin">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuSiswa', this)">
+        <span>Data Siswa</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu" id="submenuSiswa">
+        <button onclick="loadPage('input')">Input Data</button>
+        <button onclick="loadPage('lihat')">Lihat Data</button>
+        <button onclick="loadPage('siswa-lulus')">Siswa Lulus</button>
+      </div>
+    </div>
+
+    <div class="menu-group role-menu role-admin role-urusan" id="menuKurikulum">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuKurikulum', this)">
+        <span>Kurikulum</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu submenu-sectioned" id="submenuKurikulum">
+        <div class="submenu-section-label">Administrasi Awal</div>
+        <button onclick="loadPage('kelas')">Data Kelas</button>
+        <button onclick="loadPage('mapel')">Data Mapel</button>
+        <button onclick="loadPage('tugas-tambahan')">Tugas Tambahan</button>
+        <button onclick="loadPage('mengajar')">Pembagian Mengajar</button>
+        <button onclick="loadPage('rekap-tugas-mengajar')">Rekap Administrasi</button>
+
+        <div class="submenu-section-divider"></div>
+        <div class="submenu-section-label">Asesmen</div>
+        <button onclick="loadPage('pembagian-ruang')">Pembagian Ruang</button>
+        <button onclick="loadPage('asesmen-administrasi')">Rekap Asesmen</button>
+        <button onclick="loadPage('nilai-input')">Nilai</button>
+        <button onclick="loadPage('rekap-nilai')">Rekap Nilai</button>
+      </div>
+    </div>
+
+    <div class="menu-group role-menu role-guru" id="menuNilaiGuru">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuNilaiGuru', this)">
+        <span>Nilai</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu" id="submenuNilaiGuru">
+        <button onclick="loadPage('nilai-input-guru')">Input Nilai</button>
+      </div>
+    </div>
+
+    <div class="menu-group role-menu role-koordinator" id="menuSiswaKoordinator">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuSiswaKoordinator', this)">
+        <span>Data Siswa</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu" id="submenuSiswaKoordinator">
+        <button onclick="loadPage('input')">Input Data</button>
+        <button onclick="loadPage('lihat')">Lihat Data</button>
+        <button onclick="loadPage('kelas-bayangan-siswa')">Lihat Data Kelas Real</button>
+      </div>
+    </div>
+
+    <div class="menu-group role-menu role-koordinator" id="menuKurikulumKoordinator">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuKurikulumKoordinator', this)">
+        <span>Kurikulum</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu submenu-sectioned" id="submenuKurikulumKoordinator">
+        <div class="submenu-section-label">Nilai</div>
+        <button onclick="loadPage('nilai-input')">Nilai</button>
+        <button onclick="loadPage('rekap-nilai')">Rekap Nilai</button>
+      </div>
+    </div>
+
+    <div class="sidebar-menu-divider"></div>
+
+    <div class="menu-group role-menu role-admin role-koordinator" id="menuWaliKelas">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuWaliKelas', this)">
+        <span>Wali Kelas</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu" id="submenuWaliKelas">
+        <button onclick="loadPage('wali-kehadiran')">Kehadiran Siswa</button>
+        <button onclick="loadPage('wali-kelengkapan')">Cek Kelengkapan Nilai Siswa</button>
+        <button onclick="loadPage('nilai-rapor')">Cetak Rapor</button>
+      </div>
+    </div>
+
+    <div class="menu-group role-menu role-admin">
+      <button class="menu menu-parent" onclick="toggleMenu('submenuKelasBayangan', this)">
+        <span>Kelas Real</span>
+        <span class="menu-caret">+</span>
+      </button>
+      <div class="submenu" id="submenuKelasBayangan">
+        <button onclick="loadPage('kelas-bayangan-kelas')">Data Kelas</button>
+        <button onclick="loadPage('kelas-bayangan-siswa')">Data Siswa</button>
+        <button onclick="loadPage('kelas-bayangan-mapel')">Data Mapel</button>
+        <button onclick="loadPage('kelas-bayangan-mengajar')">Pembagian Mengajar</button>
+        <button onclick="loadPage('kelas-bayangan-rekap-mengajar')">Rekap Tugas Mengajar</button>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <span>Sistem aktif</span>
+      <strong id="firebaseProjectInfo">Supabase</strong>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" onclick="toggleSidebar(true)"></div>
+
+  <div class="main-panel">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="icon-btn" onclick="toggleSidebar()" aria-label="Buka sidebar">Menu</button>
+        <button class="topbar-btn topbar-btn-home topbar-btn-header" onclick="renderHome()">Beranda</button>
+        <div class="topbar-title">
+          <span>Panel Administrasi</span>
+          <h1 id="pageTitle">Beranda Dashboard</h1>
+        </div>
+      </div>
+    </header>
+
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="inline-notification.js?v=20260409a"></script>
+<script src="Semester/semester.js?v=20260408n"></script>
+<script src="Siswa/validation.js"></script>
+<script src="Siswa/crud.js?v=20260408b"></script>
+<script src="Siswa/excel.js?v=20260409b"></script>
+<script src="Siswa/murid.js?v=20260409e"></script>
+<script src="Siswa/ui.js?v=20260409b"></script>
+<script src="Siswa/kelas-bayangan.js?v=20260409b"></script>
+<script src="Siswa/siswa-lulus.js?v=20260408a"></script>
+<script src="Guru/validation.js"></script>
+<script src="Guru/crud.js"></script>
+<script src="Guru/guru.js?v=20260409a"></script>
+<script src="Guru/ui.js"></script>
+<script src="Admin/users.js?v=20260409n"></script>
+<script src="Admin/backup.js?v=20260408d"></script>
+<script src="Mapel/crud.js?v=20260407c"></script>
+<script src="Mapel/mapel.js?v=20260408h"></script>
+<script src="Mapel/ui.js?v=20260408e"></script>
+<script src="Kelas/crud.js?v=20260408b"></script>
+<script src="Kelas/kelas.js?v=20260408h"></script>
+<script src="Kelas/ui.js?v=20260408a"></script>
+<script src="Mengajar/crud.js?v=20260406c"></script>
+<script src="Mengajar/mengajar.js?v=20260409a"></script>
+<script src="Mengajar/ui.js?v=20260409a"></script>
+<script src="TugasTambahan/tugas-tambahan.js?v=20260409i"></script>
+<script src="Rekap/rekap-v2.js?v=20260409i"></script>
+<script src="Asesmen/pembagian-ruang-v2.js?v=20260407o"></script>
+<script src="Nilai/nilai.js?v=20260409c"></script>
+<script src="Nilai/rapor.js?v=20260409a"></script>
+<script src="WaliKelas/wali-kelas.js?v=20260409c"></script>
+
+<script>
+  if (localStorage.getItem("login") !== "true") {
+    window.location.href = "login.html";
+  }
+
+  function logout() {
+    localStorage.removeItem("login");
+    localStorage.removeItem("appUser");
+    localStorage.removeItem("appSemester");
+    window.location.href = "login.html";
+  }
+
+  function getCurrentAppUser() {
+    try {
+      return JSON.parse(localStorage.getItem("appUser") || "{}");
+    } catch {
+      return {};
+    }
+  }
+
+  function getCurrentAppRole() {
+    return getCurrentAppUser().role || "admin";
+  }
+
+  function canUseCoordinatorAccess() {
+    const role = getCurrentAppRole();
+    if (role === "koordinator") return true;
+    if (role === "guru") return getStoredCoordinatorLevels().length > 0;
+    return false;
+  }
+
+  function getStoredCoordinatorLevels() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem("appKoordinatorLevels") || "[]");
+      return Array.isArray(parsed) ? parsed.map(item => String(item || "")).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function setStoredCoordinatorLevels(levels) {
+    const normalized = [...new Set((Array.isArray(levels) ? levels : []).map(item => String(item || "").trim()).filter(Boolean))];
+    localStorage.setItem("appKoordinatorLevels", JSON.stringify(normalized));
+    return normalized;
+  }
+
+  function getCurrentCoordinatorLevelsSync() {
+    return getStoredCoordinatorLevels();
+  }
+
+  async function refreshCoordinatorLevels() {
+    if (!["koordinator", "guru"].includes(getCurrentAppRole())) {
+      setStoredCoordinatorLevels([]);
+      return [];
+    }
+    const kodeGuru = String(getCurrentAppUser().kode_guru || "").trim();
+    if (!kodeGuru) {
+      setStoredCoordinatorLevels([]);
+      return [];
+    }
+    try {
+      const snapshot = await db.collection("informasi_urusan").doc("koordinator_kelas").get();
+      const data = snapshot.exists ? snapshot.data() : {};
+      const levels = [];
+      if (String(data.kelas_7 || "").trim() === kodeGuru) levels.push("7");
+      if (String(data.kelas_8 || "").trim() === kodeGuru) levels.push("8");
+      if (String(data.kelas_9 || "").trim() === kodeGuru) levels.push("9");
+      return setStoredCoordinatorLevels(levels);
+    } catch {
+      return setStoredCoordinatorLevels([]);
+    }
+  }
+
+  function getSidebarSemesterLabel() {
+    try {
+      const semester = JSON.parse(localStorage.getItem("appSemester") || "{}");
+      if (semester.label) return semester.label;
+      if (semester.semester || semester.tahun) return `${semester.semester || "-"} - ${semester.tahun || "-"}`;
+    } catch {
+      // fallback below
+    }
+    return "GENAP - 2025/2026";
+  }
+
+  function updateSidebarSemesterInfo() {
+    const info = document.getElementById("sidebarSemesterInfo");
+    if (info) info.innerText = getSidebarSemesterLabel();
+    const roleInfo = document.getElementById("sidebarRoleInfo");
+    if (roleInfo) {
+      const role = getCurrentAppRole();
+      const labelMap = {
+        admin: "Admin",
+        guru: canUseCoordinatorAccess() ? "Guru + Koordinator" : "Guru",
+        koordinator: "Koordinator",
+        urusan: "Urusan",
+        siswa: "Siswa"
+      };
+      roleInfo.innerText = labelMap[role] || "Pengguna";
+    }
+    const firebaseInfo = document.getElementById("firebaseProjectInfo");
+    if (firebaseInfo) firebaseInfo.innerText = "Supabase";
+  }
+
+  function getDashboardCollectionQuery(collectionName, orderField = "") {
+    if (["siswa", "kelas"].includes(collectionName) && typeof getSemesterCollectionQuery === "function") {
+      return getSemesterCollectionQuery(collectionName, orderField);
+    }
+    const ref = db.collection(collectionName);
+    return orderField ? ref.orderBy(orderField) : ref;
+  }
+
+  function canAccessPage(page) {
+    const role = getCurrentAppRole();
+    if (role === "admin") return true;
+    if (["admin-user", "admin-hierarki"].includes(page)) return false;
+    if (role === "guru") {
+      if (canUseCoordinatorAccess()) {
+        return ["input", "lihat", "kelas-bayangan-siswa", "nilai-input", "nilai-input-guru", "rekap-nilai", "nilai-rapor", "wali-kehadiran", "wali-kelengkapan"].includes(page);
+      }
+      return ["nilai-input-guru", "nilai-rapor", "wali-kehadiran", "wali-kelengkapan"].includes(page);
+    }
+    if (role === "koordinator") return ["input", "lihat", "kelas-bayangan-siswa", "nilai-input", "nilai-input-guru", "rekap-nilai", "wali-kehadiran", "wali-kelengkapan"].includes(page);
+    if (role === "urusan") return !["guru-input", "guru-lihat", "input", "lihat", "nilai-input", "nilai-rapor"].includes(page);
+    if (role === "siswa") return false;
+    return false;
+  }
+
+  function applyRoleAccess() {
+    const role = getCurrentAppRole();
+    document.querySelectorAll(".role-menu").forEach(menu => {
+      menu.style.display = menu.classList.contains(`role-${role}`) ? "" : "none";
+    });
+
+    const waliMenu = document.getElementById("menuWaliKelas");
+    const nilaiMenu = document.getElementById("menuNilaiGuru");
+    const siswaKoordinatorMenu = document.getElementById("menuSiswaKoordinator");
+    const kurikulumKoordinatorMenu = document.getElementById("menuKurikulumKoordinator");
+    if (!waliMenu) return;
+    if (role === "admin") {
+      waliMenu.style.display = "";
+      return;
+    }
+    if (role === "koordinator") {
+      refreshCoordinatorLevels().then(levels => {
+        waliMenu.style.display = levels.length ? "" : "none";
+      });
+      return;
+    }
+    waliMenu.style.display = "none";
+    if (role === "guru") {
+      const kodeGuru = String(getCurrentAppUser().kode_guru || "").trim();
+      if (!kodeGuru) return;
+      Promise.all([
+        getDashboardCollectionQuery("kelas").where("kode_guru", "==", kodeGuru).limit(1).get(),
+        refreshCoordinatorLevels()
+      ])
+        .then(([snapshot, coordinatorLevels]) => {
+          const hasCoordinatorAccess = Array.isArray(coordinatorLevels) && coordinatorLevels.length > 0;
+          waliMenu.style.display = snapshot.empty && !hasCoordinatorAccess ? "none" : "";
+          if (nilaiMenu) nilaiMenu.style.display = "";
+          if (siswaKoordinatorMenu) siswaKoordinatorMenu.style.display = hasCoordinatorAccess ? "" : "none";
+          if (kurikulumKoordinatorMenu) kurikulumKoordinatorMenu.style.display = hasCoordinatorAccess ? "" : "none";
+        })
+        .catch(() => {
+          waliMenu.style.display = "none";
+          if (nilaiMenu) nilaiMenu.style.display = "";
+          if (siswaKoordinatorMenu) siswaKoordinatorMenu.style.display = "none";
+          if (kurikulumKoordinatorMenu) kurikulumKoordinatorMenu.style.display = "none";
+        });
+      return;
+    }
+    if (siswaKoordinatorMenu) siswaKoordinatorMenu.style.display = "none";
+    if (kurikulumKoordinatorMenu) kurikulumKoordinatorMenu.style.display = "none";
+  }
+
+  function renderHome() {
+    const content = document.getElementById("content");
+    const pageTitle = document.getElementById("pageTitle");
+    if (pageTitle) pageTitle.innerText = "Beranda Dashboard";
+    if (getCurrentAppRole() === "guru" && !canUseCoordinatorAccess()) {
+      renderGuruHome(content, pageTitle);
+      return;
+    }
+    if (getCurrentAppRole() === "guru" && canUseCoordinatorAccess()) {
+      renderKoordinatorHome(content, pageTitle);
+      return;
+    }
+    if (getCurrentAppRole() === "koordinator") {
+      renderKoordinatorHome(content, pageTitle);
+      return;
+    }
+
+    content.innerHTML = `
+      <section class="dashboard-hero">
+        <div class="dashboard-hero-copy">
+          <span class="dashboard-eyebrow">Ringkasan Data</span>
+          <h2>Guru, siswa, rombel, mapel, dan pembagian mengajar dalam satu pantauan.</h2>
+          <p id="homeUpdatedAt">Memuat data terbaru...</p>
+          <div class="dashboard-hero-actions">
+            <button class="btn-secondary" onclick="loadPage('mengajar')">Buka Pembagian</button>
+            <button class="btn-secondary" onclick="loadPage('tugas-tambahan')">Buka Tugas Tambahan</button>
+            <button class="btn-secondary" onclick="loadPage('guru-lihat')">Buka Data Guru</button>
+          </div>
+        </div>
+
+        <div class="dashboard-hero-panel">
+          <div class="dashboard-stat">
+            <span>Jumlah Guru</span>
+            <strong id="homeGuruCount">...</strong>
+          </div>
+          <div class="dashboard-stat">
+            <span>Jumlah Rombel</span>
+            <strong id="homeKelasCount">...</strong>
+          </div>
+          <div class="dashboard-stat">
+            <span>Total Siswa</span>
+            <strong id="homeSiswaCount">...</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Pembelajaran</span>
+          <h3 id="homeMapelCount">0 mapel</h3>
+          <p id="homeMengajarCount">0 pembagian mengajar tersimpan</p>
+        </article>
+
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Kelas</span>
+          <h3 id="homeWaliCount">0 wali kelas</h3>
+          <p id="homeKelasBayanganInfo">Kelas real belum dihitung</p>
+        </article>
+
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Tugas Tambahan</span>
+          <h3 id="homeTugasTambahanCount">0 tugas</h3>
+          <p id="homeTugasTambahanJp">0 JP terdaftar</p>
+        </article>
+
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Rekap JP Guru</span>
+          <div id="homeGuruJpList" class="dashboard-mini-list">
+            <span>Memuat rekap JP...</span>
+          </div>
+        </article>
+
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Sebaran Siswa</span>
+          <div id="homeSiswaByLevel" class="dashboard-mini-list">
+            <span>Memuat sebaran siswa...</span>
+          </div>
+        </article>
+      </section>
+    `;
+    loadHomeStats();
+  }
+
+  function escapeDashboardHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function getDashboardKelasParts(kelasValue = "") {
+    const normalized = String(kelasValue || "").trim().toUpperCase().replace(/\s+/g, "");
+    const match = normalized.match(/([7-9])([A-Z]+)$/);
+    return {
+      tingkat: match ? match[1] : "",
+      rombel: match ? match[2] : "",
+      kelas: match ? `${match[1]} ${match[2]}` : String(kelasValue || "").trim().toUpperCase()
+    };
+  }
+
+  function getDashboardSiswaKelasBayanganParts(siswa) {
+    const asli = getDashboardKelasParts(siswa.kelas);
+    const bayangan = getDashboardKelasParts(siswa.kelas_bayangan);
+    if (bayangan.tingkat === asli.tingkat && /^[A-H]$/.test(bayangan.rombel)) return bayangan;
+    if (/^[A-H]$/.test(asli.rombel)) return asli;
+    return { tingkat: asli.tingkat, rombel: "", kelas: "" };
+  }
+
+  function getDashboardJenisKelamin(siswa) {
+    const raw = String(siswa.jenis_kelamin || siswa.jk || siswa.gender || siswa.kelamin || "").trim().toLowerCase();
+    if (["l", "lk", "laki", "laki-laki", "laki laki", "1"].includes(raw)) return "L";
+    if (["p", "pr", "perempuan", "2"].includes(raw)) return "P";
+    return "";
+  }
+
+  function getDashboardMapelName(mapelList, mapelKode) {
+    const target = String(mapelKode || "").trim().toUpperCase();
+    const mapel = mapelList.find(item => String(item.kode_mapel || item.id || "").trim().toUpperCase() === target);
+    return mapel?.nama_mapel || mapel?.kode_mapel || mapelKode || "-";
+  }
+
+  function getDashboardMapelJp(mapelList, mapelKode) {
+    const target = String(mapelKode || "").trim().toUpperCase();
+    const mapel = mapelList.find(item => String(item.kode_mapel || item.id || "").trim().toUpperCase() === target);
+    return Number(mapel?.jp || 0);
+  }
+
+  function formatDashboardGuruName(guru, fallbackUser = {}) {
+    if (guru && typeof formatNamaGuru === "function") return formatNamaGuru(guru);
+    return guru?.nama || fallbackUser.nama || fallbackUser.guru_nama || fallbackUser.username || "Guru";
+  }
+
+  function getDashboardTugasNames(assignment, tugasList) {
+    const slots = [
+      ["utama_id", "utama_nama"],
+      ["ekuivalen_1_id", "ekuivalen_1_nama"],
+      ["ekuivalen_2_id", "ekuivalen_2_nama"],
+      ["ekuivalen_3_id", "ekuivalen_3_nama"],
+      ["sekolah_1_id", "sekolah_1_nama"],
+      ["sekolah_2_id", "sekolah_2_nama"],
+      ["sekolah_3_id", "sekolah_3_nama"]
+    ];
+    return slots.map(([idField, nameField]) => {
+      const id = assignment?.[idField] || "";
+      const tugas = tugasList.find(item => item.id === id);
+      return assignment?.[nameField] || tugas?.nama || "";
+    }).filter(Boolean);
+  }
+
+  function renderGuruHome(content, pageTitle) {
+    if (pageTitle) pageTitle.innerText = "Beranda Guru";
+    content.innerHTML = `
+      <section class="dashboard-hero">
+        <div class="dashboard-hero-copy">
+          <span class="dashboard-eyebrow">Ringkasan Guru</span>
+          <h2 id="guruHomeName">Memuat data guru...</h2>
+          <p id="guruHomeUpdatedAt">Memuat tugas mengajar, tugas tambahan, dan kelas wali.</p>
+          <div class="dashboard-hero-actions">
+            <button class="btn-secondary" onclick="loadPage('nilai-input-guru')">Input Nilai</button>
+            <button class="btn-secondary" onclick="loadPage('wali-kehadiran')">Kehadiran Siswa</button>
+            <button class="btn-secondary" onclick="loadPage('wali-kelengkapan')">Kelengkapan Nilai</button>
+          </div>
+        </div>
+
+        <div class="dashboard-hero-panel">
+          <div class="dashboard-stat">
+            <span>Tugas Mengajar</span>
+            <strong id="guruHomeMengajarCount">...</strong>
+          </div>
+          <div class="dashboard-stat">
+            <span>Jumlah JP</span>
+            <strong id="guruHomeJpCount">...</strong>
+          </div>
+          <div class="dashboard-stat">
+            <span>Kelas Wali</span>
+            <strong id="guruHomeWaliKelas">...</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Tugas Mengajar</span>
+          <div id="guruHomeMengajarList" class="dashboard-mini-list">
+            <span>Memuat tugas mengajar...</span>
+          </div>
+        </article>
+
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Tugas Tambahan</span>
+          <h3 id="guruHomeTugasJp">0 JP</h3>
+          <div id="guruHomeTugasList" class="dashboard-mini-list">
+            <span>Memuat tugas tambahan...</span>
+          </div>
+        </article>
+
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Informasi Wali Kelas</span>
+          <h3 id="guruHomeWaliSummary">Bukan wali kelas</h3>
+          <div id="guruHomeWaliInfo" class="dashboard-mini-list">
+            <span>Data wali kelas akan tampil jika tersedia.</span>
+          </div>
+        </article>
+
+        <article class="dashboard-card-lite">
+          <span class="dashboard-card-label">Akses Cepat</span>
+          <div class="dashboard-mini-list">
+            <span><strong>Nilai</strong><b>UH1, UH2, UH3, PTS</b></span>
+            <span><strong>Kehadiran</strong><b>S, I, A</b></span>
+            <span><strong>Kelengkapan</strong><b>per mapel</b></span>
+          </div>
+        </article>
+      </section>
+    `;
+    loadGuruHomeStats();
+  }
+
+  function renderKoordinatorHome(content, pageTitle) {
+    if (pageTitle) pageTitle.innerText = "Beranda Koordinator";
+    const levels = getCurrentCoordinatorLevelsSync();
+    content.innerHTML = `
+      <section class="dashboard-hero">
+        <div class="dashboard-hero-copy">
+          <span class="dashboard-eyebrow">Koordinator</span>
+          <h2>Area kerja jenjang ${escapeDashboardHtml(levels.length ? levels.join(", ") : "-")}.</h2>
+          <p>Akses dibatasi ke data siswa, nilai, wali kelas, dan kelas real sesuai jenjang yang Anda koordinasi.</p>
+          <div class="dashboard-hero-actions">
+            <button class="btn-secondary" onclick="loadPage('lihat')">Data Siswa</button>
+            <button class="btn-secondary" onclick="loadPage('nilai-input')">Nilai</button>
+            <button class="btn-secondary" onclick="loadPage('wali-kelengkapan')">Wali Kelas</button>
+          </div>
+        </div>
+        <div class="dashboard-hero-panel">
+          <div class="dashboard-stat">
+            <span>Jenjang Aktif</span>
+            <strong>${escapeDashboardHtml(levels.length ? levels.join(", ") : "-")}</strong>
+          </div>
+          <div class="dashboard-stat">
+            <span>Kelas Real</span>
+            <strong>Tersedia</strong>
+          </div>
+          <div class="dashboard-stat">
+            <span>Status Akses</span>
+            <strong>Koordinator</strong>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderRekapNilaiPlaceholderPage() {
+    const levels = getCurrentCoordinatorLevelsSync();
+    return `
+      <div class="card">
+        <div class="kelas-bayangan-head nilai-page-head">
+          <div>
+            <span class="dashboard-eyebrow">Nilai</span>
+            <h2>Rekap Nilai</h2>
+            <p>Halaman ini sedang disiapkan${levels.length ? ` untuk jenjang ${escapeDashboardHtml(levels.join(", "))}` : ""}.</p>
+          </div>
+        </div>
+        <div class="empty-panel">Menu rekap nilai masih dikosongkan dulu sesuai permintaan.</div>
+      </div>
+    `;
+  }
+
+  async function loadGuruHomeStats() {
+    const user = getCurrentAppUser();
+    const kodeGuru = String(user.kode_guru || "").trim();
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.innerText = value;
+    };
+    if (!kodeGuru) {
+      setText("guruHomeName", user.nama || user.username || "Guru");
+      setText("guruHomeUpdatedAt", "Kode guru belum tersambung ke akun ini.");
+      return;
+    }
+
+    try {
+      const [guruSnap, siswaSnap, kelasSnap, mapelSnap, mengajarSnap, tugasSnap, tugasGuruSnap] = await Promise.all([
+        db.collection("guru").get(),
+        getDashboardCollectionQuery("siswa").get(),
+        getDashboardCollectionQuery("kelas").get(),
+        db.collection("mapel_bayangan").get(),
+        db.collection("mengajar_bayangan").get(),
+        db.collection("tugas_tambahan").get(),
+        db.collection("guru_tugas_tambahan").doc(kodeGuru).get()
+      ]);
+
+      const guruList = guruSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const siswa = siswaSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const kelas = kelasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const mapel = mapelSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const mengajar = mengajarSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const tugas = tugasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const tugasGuru = tugasGuruSnap.exists ? { id: tugasGuruSnap.id, ...tugasGuruSnap.data() } : {};
+      const guru = guruList.find(item => String(item.kode_guru || "").trim() === kodeGuru) || {};
+      const myAssignments = mengajar.filter(item => String(item.guru_kode || "").trim() === kodeGuru);
+      const totalMengajarJp = myAssignments.reduce((sum, item) => sum + getDashboardMapelJp(mapel, item.mapel_kode), 0);
+      const tugasNames = getDashboardTugasNames(tugasGuru, tugas);
+      const tugasJp = Number(tugasGuru.jp_tugas_tambahan || 0);
+      const waliRows = kelas.filter(item => String(item.kode_guru || "").trim() === kodeGuru);
+
+      const groupedAssignments = new Map();
+      myAssignments.forEach(item => {
+        const kode = String(item.mapel_kode || "").trim().toUpperCase();
+        if (!kode) return;
+        if (!groupedAssignments.has(kode)) {
+          groupedAssignments.set(kode, { kode, nama: getDashboardMapelName(mapel, kode), jp: getDashboardMapelJp(mapel, kode), kelas: [] });
+        }
+        groupedAssignments.get(kode).kelas.push(`${item.tingkat || ""}${String(item.rombel || "").toUpperCase()}`);
+      });
+      const assignmentItems = [...groupedAssignments.values()].sort((a, b) => a.nama.localeCompare(b.nama, undefined, { sensitivity: "base" }));
+
+      setText("guruHomeName", formatDashboardGuruName(guru, user));
+      setText("guruHomeMengajarCount", `${myAssignments.length} kelas-mapel`);
+      setText("guruHomeJpCount", `${totalMengajarJp + tugasJp} JP`);
+      setText("guruHomeTugasJp", `${tugasJp} JP`);
+      setText("guruHomeWaliKelas", waliRows.length ? waliRows.map(item => getDashboardKelasParts(item.kelas || `${item.tingkat || ""}${item.rombel || ""}`).kelas).join(", ") : "-");
+      setText("guruHomeUpdatedAt", `Data dimuat ${new Date().toLocaleString("id-ID")}`);
+
+      const mengajarList = document.getElementById("guruHomeMengajarList");
+      if (mengajarList) {
+        mengajarList.innerHTML = assignmentItems.length
+          ? assignmentItems.map(item => `<span><strong>${escapeDashboardHtml(item.nama)}</strong><b>${escapeDashboardHtml(item.kelas.sort().join(", "))} | ${item.jp * item.kelas.length} JP</b></span>`).join("")
+          : "<span>Belum ada tugas mengajar kelas real.</span>";
+      }
+
+      const tugasList = document.getElementById("guruHomeTugasList");
+      if (tugasList) {
+        tugasList.innerHTML = tugasNames.length
+          ? tugasNames.map(name => `<span><strong>${escapeDashboardHtml(name)}</strong><b>aktif</b></span>`).join("")
+          : "<span>Belum ada tugas tambahan.</span>";
+      }
+
+      const waliSummary = document.getElementById("guruHomeWaliSummary");
+      const waliInfo = document.getElementById("guruHomeWaliInfo");
+      if (waliRows.length && waliSummary && waliInfo) {
+        const waliKelas = getDashboardKelasParts(waliRows[0].kelas || `${waliRows[0].tingkat || ""}${waliRows[0].rombel || ""}`).kelas;
+        const waliStudents = siswa
+          .map(item => ({ ...item, kelasBayanganParts: getDashboardSiswaKelasBayanganParts(item) }))
+          .filter(item => item.kelasBayanganParts.kelas === waliKelas);
+        const genderCounts = waliStudents.reduce((result, item) => {
+          const gender = getDashboardJenisKelamin(item);
+          if (gender === "L") result.L += 1;
+          else if (gender === "P") result.P += 1;
+          else result.lain += 1;
+          return result;
+        }, { L: 0, P: 0, lain: 0 });
+        waliSummary.innerText = `Kelas ${waliKelas}`;
+        waliInfo.innerHTML = `
+          <span><strong>Jumlah siswa</strong><b>${waliStudents.length}</b></span>
+          <span><strong>Laki-laki</strong><b>${genderCounts.L}</b></span>
+          <span><strong>Perempuan</strong><b>${genderCounts.P}</b></span>
+          <span><strong>Belum valid</strong><b>${genderCounts.lain}</b></span>
+        `;
+      }
+    } catch (error) {
+      console.error(error);
+      setText("guruHomeUpdatedAt", "Ringkasan guru belum berhasil dimuat.");
+    }
+  }
+
+  async function loadHomeStats() {
+    try {
+      const [guruSnap, siswaSnap, kelasSnap, mapelSnap, mengajarSnap, tugasSnap] = await Promise.all([
+        db.collection("guru").get(),
+        getDashboardCollectionQuery("siswa").get(),
+        getDashboardCollectionQuery("kelas").get(),
+        db.collection("mapel").get(),
+        db.collection("mengajar").get(),
+        db.collection("tugas_tambahan").get()
+      ]);
+
+      const guru = guruSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const siswa = siswaSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const kelas = kelasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const mapel = mapelSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const mengajar = mengajarSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const tugas = tugasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = value;
+      };
+
+      const siswaByLevel = { 7: 0, 8: 0, 9: 0, lain: 0 };
+      siswa.forEach(item => {
+        const level = getDashboardKelasParts(item.kelas).tingkat;
+        if (siswaByLevel[level] !== undefined) siswaByLevel[level]++;
+        else siswaByLevel.lain++;
+      });
+
+      const guruByJp = guru
+        .map(item => ({
+          nama: typeof formatNamaGuru === "function" ? formatNamaGuru(item) : item.nama || item.kode_guru || "-",
+          jp: Number(item.jp || 0)
+        }))
+        .sort((a, b) => b.jp - a.jp || a.nama.localeCompare(b.nama, undefined, { sensitivity: "base" }))
+        .slice(0, 8);
+
+      const waliCount = kelas.filter(item => String(item.kode_guru || "").trim() || String(item.wali_kelas || "").trim()).length;
+      const kelasBayanganCount = siswa.filter(item => String(item.kelas_bayangan || "").trim()).length;
+      const totalTugasJp = tugas.reduce((sum, item) => sum + Number(item.jp || 0), 0);
+
+      setText("homeGuruCount", `${guru.length}`);
+      setText("homeKelasCount", `${kelas.length}`);
+      setText("homeSiswaCount", `${siswa.length}`);
+      setText("homeMapelCount", `${mapel.length} mapel`);
+      setText("homeMengajarCount", `${mengajar.length} pembagian mengajar tersimpan`);
+      setText("homeWaliCount", `${waliCount}/${kelas.length} wali kelas`);
+      setText("homeKelasBayanganInfo", `${kelasBayanganCount} siswa memiliki kelas real manual`);
+      setText("homeTugasTambahanCount", `${tugas.length} tugas`);
+      setText("homeTugasTambahanJp", `${totalTugasJp} JP terdaftar`);
+      setText("homeUpdatedAt", `Data dimuat ${new Date().toLocaleString("id-ID")}`);
+
+      const jpList = document.getElementById("homeGuruJpList");
+      if (jpList) {
+        jpList.innerHTML = guruByJp.length
+          ? guruByJp.map(item => `<span><strong>${escapeDashboardHtml(item.nama)}</strong><b>${item.jp} JP</b></span>`).join("")
+          : "<span>Belum ada data JP guru.</span>";
+      }
+
+      const siswaList = document.getElementById("homeSiswaByLevel");
+      if (siswaList) {
+        siswaList.innerHTML = `
+          <span><strong>Kelas 7</strong><b>${siswaByLevel[7]} siswa</b></span>
+          <span><strong>Kelas 8</strong><b>${siswaByLevel[8]} siswa</b></span>
+          <span><strong>Kelas 9</strong><b>${siswaByLevel[9]} siswa</b></span>
+          <span><strong>Belum valid</strong><b>${siswaByLevel.lain} siswa</b></span>
+        `;
+      }
+    } catch (error) {
+      console.error(error);
+      const updated = document.getElementById("homeUpdatedAt");
+      if (updated) updated.innerText = "Ringkasan belum berhasil dimuat.";
+    }
+  }
+
+  function toggleSidebar(forceClose = false) {
+    if (forceClose) {
+      document.body.classList.add("sidebar-collapsed");
+      return;
+    }
+    document.body.classList.toggle("sidebar-collapsed");
+  }
+
+  function toggleMenu(id, buttonEl) {
+    const s = document.getElementById(id);
+    if (!s) return;
+    const currentDisplay = window.getComputedStyle(s).display;
+    const isOpen = currentDisplay !== "none";
+    s.style.display = isOpen ? "none" : "block";
+    if (buttonEl) {
+      buttonEl.classList.toggle("active", !isOpen);
+    }
+  }
+
+  function loadPage(page) {
+    const content = document.getElementById("content");
+    const pageTitle = document.getElementById("pageTitle");
+
+    if (!canAccessPage(page)) {
+      Swal.fire("Akses ditolak", "Role pengguna tidak memiliki akses ke menu ini.", "warning");
+      return;
+    }
+
+    if (unsubscribe) {
+      unsubscribe();
+      unsubscribe = null;
+    }
+
+    if (unsubscribeGuru) {
+      unsubscribeGuru();
+      unsubscribeGuru = null;
+    }
+
+    if (unsubscribeGuruMapelOptions) {
+      unsubscribeGuruMapelOptions();
+      unsubscribeGuruMapelOptions = null;
+    }
+
+    if (unsubscribeMapel) {
+      unsubscribeMapel();
+      unsubscribeMapel = null;
+    }
+
+    if (unsubscribeKelas) {
+      unsubscribeKelas();
+      unsubscribeKelas = null;
+    }
+
+    if (unsubscribeKelasGuru) {
+      unsubscribeKelasGuru();
+      unsubscribeKelasGuru = null;
+    }
+
+    if (unsubscribeKelasMengajar) {
+      unsubscribeKelasMengajar();
+      unsubscribeKelasMengajar = null;
+    }
+
+    if (unsubscribeKelasSiswa) {
+      unsubscribeKelasSiswa();
+      unsubscribeKelasSiswa = null;
+    }
+
+    if (unsubscribeSiswaKelasOptions) {
+      unsubscribeSiswaKelasOptions();
+      unsubscribeSiswaKelasOptions = null;
+    }
+
+    if (unsubscribeMengajar) {
+      unsubscribeMengajar();
+      unsubscribeMengajar = null;
+    }
+
+    if (unsubscribeMengajarMapel) {
+      unsubscribeMengajarMapel();
+      unsubscribeMengajarMapel = null;
+    }
+
+    if (unsubscribeMengajarKelas) {
+      unsubscribeMengajarKelas();
+      unsubscribeMengajarKelas = null;
+    }
+
+    if (unsubscribeMengajarGuru) {
+      unsubscribeMengajarGuru();
+      unsubscribeMengajarGuru = null;
+    }
+
+    if (unsubscribeMengajarSiswa) {
+      unsubscribeMengajarSiswa();
+      unsubscribeMengajarSiswa = null;
+    }
+
+    if (unsubscribeMengajarGuruTugasTambahan) {
+      unsubscribeMengajarGuruTugasTambahan();
+      unsubscribeMengajarGuruTugasTambahan = null;
+    }
+
+    if (unsubscribeTugasTambahan) {
+      unsubscribeTugasTambahan();
+      unsubscribeTugasTambahan = null;
+    }
+
+    if (unsubscribeTugasTambahanGuru) {
+      unsubscribeTugasTambahanGuru();
+      unsubscribeTugasTambahanGuru = null;
+    }
+
+    if (unsubscribeTugasTambahanAssignments) {
+      unsubscribeTugasTambahanAssignments();
+      unsubscribeTugasTambahanAssignments = null;
+    }
+
+    if (unsubscribeTugasTambahanMengajar) {
+      unsubscribeTugasTambahanMengajar();
+      unsubscribeTugasTambahanMengajar = null;
+    }
+
+    if (unsubscribeTugasTambahanMapel) {
+      unsubscribeTugasTambahanMapel();
+      unsubscribeTugasTambahanMapel = null;
+    }
+
+    if (unsubscribeTugasTambahanKelas) {
+      unsubscribeTugasTambahanKelas();
+      unsubscribeTugasTambahanKelas = null;
+    }
+
+    if (unsubscribeRekapGuru) {
+      unsubscribeRekapGuru();
+      unsubscribeRekapGuru = null;
+    }
+
+    if (unsubscribeRekapMengajar) {
+      unsubscribeRekapMengajar();
+      unsubscribeRekapMengajar = null;
+    }
+
+    if (unsubscribeRekapMapel) {
+      unsubscribeRekapMapel();
+      unsubscribeRekapMapel = null;
+    }
+
+    if (unsubscribeRekapTugasTambahan) {
+      unsubscribeRekapTugasTambahan();
+      unsubscribeRekapTugasTambahan = null;
+    }
+
+    if (unsubscribeRekapGuruTugasTambahan) {
+      unsubscribeRekapGuruTugasTambahan();
+      unsubscribeRekapGuruTugasTambahan = null;
+    }
+
+    if (unsubscribeRekapBayanganGuru) {
+      unsubscribeRekapBayanganGuru();
+      unsubscribeRekapBayanganGuru = null;
+    }
+
+    if (unsubscribeRekapBayanganMengajar) {
+      unsubscribeRekapBayanganMengajar();
+      unsubscribeRekapBayanganMengajar = null;
+    }
+
+    if (unsubscribeRekapBayanganMengajarAsli) {
+      unsubscribeRekapBayanganMengajarAsli();
+      unsubscribeRekapBayanganMengajarAsli = null;
+    }
+
+    if (unsubscribeRekapBayanganMapel) {
+      unsubscribeRekapBayanganMapel();
+      unsubscribeRekapBayanganMapel = null;
+    }
+
+    if (unsubscribeAsesmenSiswa) {
+      unsubscribeAsesmenSiswa();
+      unsubscribeAsesmenSiswa = null;
+    }
+
+    if (unsubscribeAdminGuru) {
+      unsubscribeAdminGuru();
+      unsubscribeAdminGuru = null;
+    }
+
+    if (unsubscribeAdminUser) {
+      unsubscribeAdminUser();
+      unsubscribeAdminUser = null;
+    }
+
+    if (unsubscribeAdminSiswa) {
+      unsubscribeAdminSiswa();
+      unsubscribeAdminSiswa = null;
+    }
+
+    if (unsubscribeNilaiSiswa) {
+      unsubscribeNilaiSiswa();
+      unsubscribeNilaiSiswa = null;
+    }
+
+    if (unsubscribeNilaiMapel) {
+      unsubscribeNilaiMapel();
+      unsubscribeNilaiMapel = null;
+    }
+
+    if (unsubscribeNilaiMengajar) {
+      unsubscribeNilaiMengajar();
+      unsubscribeNilaiMengajar = null;
+    }
+
+    if (unsubscribeNilaiData) {
+      unsubscribeNilaiData();
+      unsubscribeNilaiData = null;
+    }
+
+    if (unsubscribeKelasBayanganSiswa) {
+      unsubscribeKelasBayanganSiswa();
+      unsubscribeKelasBayanganSiswa = null;
+    }
+
+    if (unsubscribeKelasBayanganKelas) {
+      unsubscribeKelasBayanganKelas();
+      unsubscribeKelasBayanganKelas = null;
+    }
+
+    if (unsubscribeMengajarBayangan) {
+      unsubscribeMengajarBayangan();
+      unsubscribeMengajarBayangan = null;
+    }
+
+    if (unsubscribeMengajarBayanganAsli) {
+      unsubscribeMengajarBayanganAsli();
+      unsubscribeMengajarBayanganAsli = null;
+    }
+
+    if (unsubscribeMengajarBayanganMapel) {
+      unsubscribeMengajarBayanganMapel();
+      unsubscribeMengajarBayanganMapel = null;
+    }
+
+    if (unsubscribeMengajarBayanganGuru) {
+      unsubscribeMengajarBayanganGuru();
+      unsubscribeMengajarBayanganGuru = null;
+    }
+
+    if (typeof clearWaliKelasListeners === "function") {
+      clearWaliKelasListeners();
+    }
+
+    if (typeof clearCetakRaporListeners === "function") {
+      clearCetakRaporListeners();
+    }
+
+    if (typeof clearAdminRaporListeners === "function") {
+      clearAdminRaporListeners();
+    }
+
+    if (typeof clearAdminSemesterListeners === "function") {
+      clearAdminSemesterListeners();
+    }
+
+    if (typeof clearSiswaLulusListeners === "function") {
+      clearSiswaLulusListeners();
+    }
+
+    if (page === "mapel") {
+      setActiveMapelCollection("mapel");
+      if (pageTitle) pageTitle.innerText = "Data Mata Pelajaran";
+      content.innerHTML = renderMapelPage();
+      loadRealtimeMapel();
+    }
+
+    if (page === "kelas") {
+      if (pageTitle) pageTitle.innerText = "Data Kelas";
+      content.innerHTML = renderKelasPage();
+      loadRealtimeKelas();
+    }
+
+    if (page === "mengajar") {
+      setActiveMapelCollection("mapel");
+      if (pageTitle) pageTitle.innerText = "Pembagian Mengajar Guru";
+      content.innerHTML = renderMengajarPage();
+      loadRealtimeMengajar();
+    }
+
+    if (page === "tugas-tambahan") {
+      setActiveMapelCollection("mapel");
+      if (pageTitle) pageTitle.innerText = "Tugas Tambahan";
+      content.innerHTML = renderTugasTambahanPage();
+      loadRealtimeTugasTambahan();
+    }
+
+    if (page === "rekap-tugas-mengajar") {
+      setActiveMapelCollection("mapel");
+      if (pageTitle) pageTitle.innerText = "Rekap Tugas dan Mengajar";
+      content.innerHTML = renderRekapTugasMengajarPage();
+      loadRealtimeRekapTugasMengajar();
+    }
+
+    if (page === "pembagian-ruang") {
+      if (pageTitle) pageTitle.innerText = "Pembagian Ruang Ujian";
+      content.innerHTML = renderPembagianRuangPage();
+      loadRealtimePembagianRuang();
+    }
+
+    if (page === "admin-user") {
+      if (pageTitle) pageTitle.innerText = "Admin User";
+      content.innerHTML = renderAdminUserPage();
+      loadRealtimeAdminUsers(false);
+    }
+
+    if (page === "admin-hierarki") {
+      if (pageTitle) pageTitle.innerText = "Pengguna Hierarki";
+      content.innerHTML = renderAdminHierarchyPage();
+      loadRealtimeAdminUsers(true);
+    }
+
+    if (page === "admin-semester") {
+      if (pageTitle) pageTitle.innerText = "Semester dan Tahun Pelajaran";
+      content.innerHTML = renderAdminSemesterPage();
+      loadRealtimeAdminSemester();
+    }
+
+    if (page === "admin-rapor") {
+      if (pageTitle) pageTitle.innerText = "Administrasi Rapor";
+      content.innerHTML = renderAdminRaporPage();
+      loadRealtimeAdminRapor();
+    }
+
+    if (page === "admin-backup") {
+      if (pageTitle) pageTitle.innerText = "Backup dan Restore";
+      content.innerHTML = renderAdminBackupPage();
+    }
+
+    if (page === "nilai-input-guru") {
+      if (typeof setNilaiAccessMode === "function") setNilaiAccessMode("guru");
+      if (pageTitle) pageTitle.innerText = "Input Nilai";
+      content.innerHTML = renderInputNilaiPage();
+      loadRealtimeInputNilai();
+    }
+
+    if (page === "nilai-input") {
+      if (typeof setNilaiAccessMode === "function") setNilaiAccessMode("koordinator");
+      if (pageTitle) pageTitle.innerText = "Input Nilai";
+      content.innerHTML = renderInputNilaiPage();
+      loadRealtimeInputNilai();
+    }
+
+    if (page === "nilai-rapor") {
+      if (pageTitle) pageTitle.innerText = "Cetak Rapor";
+      content.innerHTML = renderCetakRaporPage();
+      loadRealtimeCetakRapor();
+    }
+
+    if (page === "wali-kehadiran") {
+      if (pageTitle) pageTitle.innerText = "Kehadiran Siswa";
+      content.innerHTML = renderWaliKehadiranPage();
+      loadRealtimeWaliKelas("kehadiran");
+    }
+
+    if (page === "wali-kelengkapan") {
+      if (pageTitle) pageTitle.innerText = "Cek Kelengkapan Nilai Siswa";
+      content.innerHTML = renderWaliKelengkapanPage();
+      loadRealtimeWaliKelas("kelengkapan");
+    }
+
+    if (page === "asesmen-administrasi") {
+      if (pageTitle) pageTitle.innerText = "Administrasi Asesmen";
+      content.innerHTML = renderAdministrasiAsesmenPage();
+      loadRealtimeAdministrasiAsesmen();
+    }
+
+    if (page === "rekap-nilai") {
+      if (pageTitle) pageTitle.innerText = "Rekap Nilai";
+      content.innerHTML = renderRekapNilaiPlaceholderPage();
+    }
+
+    if (page === "input") {
+      if (pageTitle) pageTitle.innerText = "Input Data Siswa";
+      content.innerHTML = renderForm();
+      loadSiswaKelasOptions();
+    }
+
+    if (page === "lihat") {
+      if (pageTitle) pageTitle.innerText = "Lihat Data Siswa";
+      content.innerHTML = renderTable();
+      loadSiswaKelasOptions();
+      loadRealtime();
+    }
+
+    if (page === "siswa-lulus") {
+      if (pageTitle) pageTitle.innerText = "Siswa Lulus";
+      content.innerHTML = renderSiswaLulusPage();
+      loadRealtimeSiswaLulus();
+    }
+
+    if (page === "kelas-bayangan-kelas") {
+      if (pageTitle) pageTitle.innerText = "Data Kelas Real";
+      content.innerHTML = renderKelasBayanganDataKelasPage();
+      loadRealtimeKelasBayangan();
+    }
+
+    if (page === "kelas-bayangan-siswa" || page === "kelas-bayangan") {
+      if (pageTitle) pageTitle.innerText = "Data Siswa Kelas Real";
+      content.innerHTML = renderKelasBayanganSiswaPage();
+      loadRealtimeKelasBayangan();
+    }
+
+    if (page === "kelas-bayangan-mapel") {
+      setActiveMapelCollection("mapel_bayangan");
+      if (pageTitle) pageTitle.innerText = "Data Mapel Kelas Real";
+      content.innerHTML = renderMapelPage();
+      loadRealtimeMapel();
+    }
+
+    if (page === "kelas-bayangan-mengajar") {
+      setActiveMapelCollection("mapel_bayangan");
+      if (pageTitle) pageTitle.innerText = "Pembagian Mengajar Kelas Real";
+      content.innerHTML = renderKelasBayanganMengajarPage();
+      loadRealtimeKelasBayanganMengajar();
+    }
+
+    if (page === "kelas-bayangan-rekap-mengajar") {
+      setActiveMapelCollection("mapel_bayangan");
+      if (pageTitle) pageTitle.innerText = "Rekap Tugas Mengajar Kelas Real";
+      content.innerHTML = renderRekapTugasMengajarBayanganPage();
+      loadRealtimeRekapTugasMengajarBayangan();
+    }
+
+    if (page === "guru-input") {
+      setActiveMapelCollection("mapel");
+      if (pageTitle) pageTitle.innerText = "Input Data Guru";
+      content.innerHTML = renderGuruForm();
+      loadGuruMapelOptions();
+    }
+
+    if (page === "guru-lihat") {
+      if (pageTitle) pageTitle.innerText = "Lihat Data Guru";
+      content.innerHTML = renderGuruTable();
+      loadRealtimeGuru();
+    }
+
+    if (window.innerWidth <= 1180) {
+      document.body.classList.add("sidebar-collapsed");
+    }
+  }
+
+  function syncResponsiveSidebar() {
+    if (window.innerWidth <= 1180) {
+      document.body.classList.add("sidebar-collapsed");
+    } else {
+      document.body.classList.remove("sidebar-collapsed");
+    }
+  }
+
+  window.addEventListener("resize", syncResponsiveSidebar);
+  syncResponsiveSidebar();
+  const finalizeDashboardBootstrap = () => {
+    applyRoleAccess();
+    updateSidebarSemesterInfo();
+    if (typeof ensureActiveSemesterDataAvailable === "function") {
+      ensureActiveSemesterDataAvailable()
+        .catch(error => console.error(error))
+        .finally(() => renderHome());
+    } else {
+      renderHome();
+    }
+  };
+
+  if (["koordinator", "guru"].includes(getCurrentAppRole())) {
+    refreshCoordinatorLevels().finally(finalizeDashboardBootstrap);
+  } else {
+    finalizeDashboardBootstrap();
+  }
+</script>
+
+</body>
+</html>

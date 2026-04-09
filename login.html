@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Login Aplikasi Siswa</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js?v=20260408a"></script>
+  <script src="supabase-firestore-compat.js?v=20260408a"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .login-box {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      width: 300px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .error {
+      color: red;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-box">
+  <h2>Login</h2>
+
+  <select id="semesterLogin">
+    <option value="">Memuat semester...</option>
+  </select>
+  <input type="text" id="username" placeholder="Username">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="login()">Masuk</button>
+
+  <div class="error" id="error">Username atau password salah</div>
+</div>
+
+<script>
+  let daftarSemesterLogin = [];
+
+  // Cegah masuk ke login jika sudah login
+  if (localStorage.getItem("login") === "true") {
+    window.location.href = "dashboard.html";
+  }
+
+  function makeDefaultLoginSemester() {
+    return {
+      id: "20252026_genap",
+      semester: "GENAP",
+      tahun: "2025/2026",
+      label: "GENAP - 2025/2026",
+      legacy: true,
+      is_active: true,
+      use_snapshot: false
+    };
+  }
+
+  function normalizeLoginSemesterList(data) {
+    const list = Array.isArray(data?.list) && data.list.length ? data.list : [makeDefaultLoginSemester()];
+    const activeId = data?.active_id || list[0]?.id || "legacy";
+    const liveId = [...list].sort(compareLoginSemesterEntries).at(-1)?.id || data?.live_id || activeId;
+    daftarSemesterLogin = list.map(item => ({
+      ...item,
+      label: item.label || `${item.semester || "-"} - ${item.tahun || "-"}`,
+      is_active: item.id === activeId,
+      use_snapshot: item.id !== activeId,
+      active_id: activeId,
+      live_id: liveId
+    }));
+
+    const select = document.getElementById("semesterLogin");
+    select.innerHTML = daftarSemesterLogin.map(item =>
+      `<option value="${item.id}" ${item.id === activeId ? "selected" : ""}>${item.label}</option>`
+    ).join("");
+  }
+
+  function compareLoginSemesterEntries(a, b) {
+    const yearA = Number(String(a?.tahun || "").match(/\d{4}/)?.[0] || 0);
+    const yearB = Number(String(b?.tahun || "").match(/\d{4}/)?.[0] || 0);
+    if (yearA !== yearB) return yearA - yearB;
+    const order = { GANJIL: 1, GENAP: 2 };
+    const semesterA = String(a?.semester || "").trim().toUpperCase() === "GANJIL" ? "GANJIL" : "GENAP";
+    const semesterB = String(b?.semester || "").trim().toUpperCase() === "GANJIL" ? "GANJIL" : "GENAP";
+    return (order[semesterA] || 0) - (order[semesterB] || 0);
+  }
+
+  async function loadSemesterLoginOptions() {
+    try {
+      const snap = await db.collection("settings").doc("semester").get();
+      normalizeLoginSemesterList(snap.exists ? snap.data() : {});
+    } catch (error) {
+      console.error(error);
+      normalizeLoginSemesterList({});
+    }
+  }
+
+  function getSelectedLoginSemester() {
+    const id = document.getElementById("semesterLogin").value || "legacy";
+    return daftarSemesterLogin.find(item => item.id === id) || makeDefaultLoginSemester();
+  }
+
+  async function login() {
+    const username = document.getElementById("username").value.trim().toLowerCase();
+    const password = document.getElementById("password").value;
+    const semester = getSelectedLoginSemester();
+    const error = document.getElementById("error");
+    error.style.display = "none";
+
+    if ((username === "admin" || !username) && (password === "admin123" || password === "kurikulumspenturi")) {
+      localStorage.setItem("login", "true");
+      localStorage.setItem("appUser", JSON.stringify({
+        username: "admin",
+        nama: "Administrator",
+        role: "admin"
+      }));
+      localStorage.setItem("appSemester", JSON.stringify(semester));
+      window.location.href = "dashboard.html";
+      return;
+    }
+
+    try {
+      const snap = await db.collection("users")
+        .where("username", "==", username)
+        .limit(1)
+        .get();
+
+      if (snap.empty) {
+        error.style.display = "block";
+        return;
+      }
+
+      const doc = snap.docs[0];
+      const user = { id: doc.id, ...doc.data() };
+      if (user.aktif === false || String(user.password || "") !== password) {
+        error.style.display = "block";
+        return;
+      }
+
+      localStorage.setItem("login", "true");
+      localStorage.setItem("appUser", JSON.stringify({
+        id: user.id,
+        username: user.username,
+        nama: user.nama,
+        role: user.role || "guru",
+        kode_guru: user.kode_guru || "",
+        nipd: user.nipd || ""
+      }));
+      localStorage.setItem("appSemester", JSON.stringify(semester));
+      window.location.href = "dashboard.html";
+    } catch (err) {
+      console.error(err);
+      error.style.display = "block";
+    }
+  }
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Enter") login();
+  });
+
+  loadSemesterLoginOptions();
+</script>
+
+</body>
+</html>

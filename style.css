@@ -2981,13 +2981,28 @@ body.dark .rekap-task-list span {
 }
 
 .wali-kehadiran-table {
-  min-width: 520px;
+  min-width: 560px;
+  table-layout: fixed;
+}
+
+.wali-kehadiran-table th,
+.wali-kehadiran-table td,
+.wali-completeness-table th,
+.wali-completeness-table td {
+  padding: 8px 10px;
+  vertical-align: middle;
 }
 
 .wali-kehadiran-table th:first-child,
 .wali-kehadiran-table td:first-child {
-  width: 48px;
+  width: 60px;
   text-align: center;
+}
+
+.wali-kehadiran-table th:nth-child(2),
+.wali-kehadiran-table td:nth-child(2) {
+  width: auto;
+  text-align: left;
 }
 
 .wali-kehadiran-table th:nth-child(3),
@@ -2996,7 +3011,7 @@ body.dark .rekap-task-list span {
 .wali-kehadiran-table td:nth-child(4),
 .wali-kehadiran-table th:nth-child(5),
 .wali-kehadiran-table td:nth-child(5) {
-  width: 62px;
+  width: 86px;
   text-align: center;
   font-weight: 800;
 }
@@ -3008,7 +3023,7 @@ body.dark .rekap-task-list span {
 }
 
 .wali-rekap-input {
-  width: 52px;
+  width: 58px;
   min-height: 28px;
   padding: 4px 6px;
   border: 1px solid rgba(148, 163, 184, 0.45);
@@ -3070,26 +3085,26 @@ body.dark .rekap-task-list span {
 }
 
 .wali-completeness-table {
-  min-width: 500px;
+  min-width: 560px;
+  table-layout: fixed;
 }
 
 .wali-completeness-table th:first-child,
 .wali-completeness-table td:first-child {
+  width: auto;
   text-align: left;
 }
 
 .wali-completeness-table th:not(:first-child),
 .wali-completeness-table td:not(:first-child) {
-  width: 64px;
+  width: 96px;
   text-align: center;
   font-weight: 800;
-  padding-left: 5px;
-  padding-right: 5px;
 }
 
 .wali-completeness-table th:last-child,
 .wali-completeness-table td:last-child {
-  width: 64px;
+  width: 96px;
   text-align: center;
 }
 

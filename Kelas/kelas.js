@@ -362,34 +362,75 @@ function resetKelasFilter() {
 
 function refreshKelasTable() {
   loadRealtimeKelas();
-  renderKelasFiltered();
 }
 
-function loadRealtimeKelas() {
+function clearKelasRealtimeListeners() {
   if (unsubscribeKelas) unsubscribeKelas();
   if (unsubscribeKelasGuru) unsubscribeKelasGuru();
   if (unsubscribeKelasMengajar) unsubscribeKelasMengajar();
   if (unsubscribeKelasSiswa) unsubscribeKelasSiswa();
+  unsubscribeKelas = null;
+  unsubscribeKelasGuru = null;
+  unsubscribeKelasMengajar = null;
+  unsubscribeKelasSiswa = null;
+}
 
-  unsubscribeKelas = listenKelas(data => {
-    semuaDataKelas = data;
-    renderKelasFiltered();
-  });
+async function loadRealtimeKelas() {
+  clearKelasRealtimeListeners();
+  const tbody = document.getElementById("tbodyKelas");
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="5">Memuat data kelas...</td></tr>`;
+  }
 
-  unsubscribeKelasGuru = listenGuru(data => {
-    daftarGuruKelas = data;
+  try {
+    const kelasQuery = typeof getSemesterCollectionQuery === "function"
+      ? getSemesterCollectionQuery("kelas", "kelas")
+      : db.collection("kelas").orderBy("kelas");
+    const siswaQuery = typeof getSemesterCollectionQuery === "function"
+      ? getSemesterCollectionQuery("siswa", "nama")
+      : db.collection("siswa").orderBy("nama");
+    const [kelasSnapshot, guruSnapshot, mengajarSnapshot, siswaSnapshot] = await Promise.all([
+      kelasQuery.get(),
+      db.collection("guru").orderBy("kode_guru").get(),
+      db.collection("mengajar").get(),
+      siswaQuery.get()
+    ]);
+    semuaDataKelas = kelasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    daftarGuruKelas = guruSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    daftarMengajarKelas = mengajarSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    daftarSiswaKelas = siswaSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     renderKelasFiltered();
-  });
+  } catch (error) {
+    console.error(error);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="5">Data kelas belum berhasil dimuat.</td></tr>`;
+    }
+  }
+}
 
-  unsubscribeKelasMengajar = listenMengajar(data => {
-    daftarMengajarKelas = data;
-    renderKelasFiltered();
-  });
+function upsertLocalKelasCache(item) {
+  const parts = getStoredKelasParts(item);
+  const key = parts.kelas || item.kelas;
+  if (!key) return;
+  const index = semuaDataKelas.findIndex(entry => getStoredKelasParts(entry).kelas === key || entry.kelas === key);
+  if (index >= 0) {
+    semuaDataKelas[index] = { ...semuaDataKelas[index], ...item };
+  } else {
+    semuaDataKelas.push(item);
+  }
+}
 
-  unsubscribeKelasSiswa = listenSiswa(data => {
-    daftarSiswaKelas = data;
-    renderKelasFiltered();
-  });
+function removeLocalKelasCache(namaKelas) {
+  const key = getStoredKelasParts({ kelas: namaKelas }).kelas || String(namaKelas || "");
+  semuaDataKelas = semuaDataKelas.filter(item => getStoredKelasParts(item).kelas !== key && item.kelas !== key);
+}
+
+function updateLocalSiswaKelasCache(nipd, payload) {
+  const key = String(nipd || "").trim();
+  const index = daftarSiswaKelas.findIndex(item => String(item.nipd || "").trim() === key);
+  if (index >= 0) {
+    daftarSiswaKelas[index] = { ...daftarSiswaKelas[index], ...payload };
+  }
 }
 
 function renderKelasFiltered() {
@@ -547,12 +588,21 @@ function renderInlineWaliKelasSelect(item) {
 
   return `
     <div class="kelas-inline-wali">
-      <select id="${escapeKelasHtml(selectId)}" class="kelas-inline-select kelas-inline-wali-select" data-previous-value="${escapeKelasHtml(selectedGuru)}" onchange="handleInlineWaliKelasChange('${escapeKelasJs(kelasValue)}', this)" ${canChooseWali || currentGuru ? "" : "disabled"}>
+      <select id="${escapeKelasHtml(selectId)}" class="kelas-inline-select kelas-inline-wali-select" data-previous-value="${escapeKelasHtml(selectedGuru)}" ${canChooseWali || currentGuru ? "" : "disabled"}>
         ${options.join("")}
       </select>
       <small id="${escapeKelasHtml(selectId)}Status" class="mapel-row-hint">${escapeKelasHtml(helperText)}</small>
     </div>
   `;
+}
+
+function renderWaliKelasDisplay(item) {
+  const kodeGuru = String(item.kode_guru || "").trim();
+  const guru = kodeGuru ? getGuruKelasByKode(kodeGuru) : null;
+  const nama = guru ? formatNamaGuru(guru) : String(item.wali_kelas || "").trim();
+  return nama
+    ? `<strong>${escapeKelasHtml(nama)}</strong>`
+    : `<span class="muted-text">Belum ada wali kelas</span>`;
 }
 
 function renderKelasRow(item, nomor) {
@@ -593,7 +643,7 @@ function renderKelasRow(item, nomor) {
     <tr data-kelas-id="${escapeKelasHtml(item.kelas || parts.kelas)}">
       <td>${parts.tingkat || "-"}</td>
       <td>${parts.rombel || "-"}</td>
-      <td>${renderInlineWaliKelasSelect(item)}</td>
+      <td>${renderWaliKelasDisplay(item)}</td>
       <td>${jumlahAnggota} siswa</td>
       <td>
         <div class="table-actions">
@@ -695,6 +745,10 @@ function importKelasExcel(event) {
         await syncWaliKelasTugasTambahan();
       }
 
+      if (berhasil > 0) {
+        await loadRealtimeKelas();
+      }
+
       Swal.fire({
         title: "Import kelas selesai",
         html: `Berhasil: ${berhasil}<br>Gagal: ${gagal}<br>Tidak valid: ${invalidRows}`,
@@ -735,7 +789,7 @@ async function simpanKelasData() {
       btn.innerText = "Menyimpan...";
     }
 
-    await saveKelas({
+    const payload = {
       tingkat,
       rombel,
       kelas,
@@ -743,10 +797,14 @@ async function simpanKelasData() {
       wali_kelas: "",
       created_at: new Date(),
       updated_at: new Date()
-    });
+    };
+
+    await saveKelas(payload);
+    upsertLocalKelasCache(payload);
 
     draftKelasTingkat = tingkat;
     syncKelasAutoFields();
+    renderKelasFiltered();
     if (err) err.innerText = "";
     Swal.fire("Berhasil", "Data kelas ditambahkan", "success");
   } catch (error) {
@@ -1012,6 +1070,8 @@ async function simpanAnggotaKelas(namaKelas, selectedNipds) {
     });
 
     await batch.commit();
+    changes.forEach((payload, nipd) => updateLocalSiswaKelasCache(nipd, payload));
+    renderKelasFiltered();
     Swal.fire("Berhasil", `${selectedSet.size} anggota tersimpan`, "success");
   } catch (error) {
     console.error(error);
@@ -1294,19 +1354,23 @@ async function applyAcakWaliResult(result) {
   try {
     Swal.fire({ title: "Menyimpan wali kelas...", didOpen: () => Swal.showLoading(), allowOutsideClick: false });
     const batch = db.batch();
+    const localPayloads = [];
     saveAcakWaliUndoSnapshot(valid);
     valid.forEach(item => {
-      const kelasRef = typeof getSemesterDocRef === "function"
-        ? getSemesterDocRef("kelas", item.kelasItem.kelas)
-        : db.collection("kelas").doc(item.kelasItem.kelas);
-      batch.set(kelasRef, {
+      const payload = {
         ...item.kelasItem,
         kode_guru: item.kode_guru,
         wali_kelas: formatNamaGuru(item.guru),
         updated_at: new Date()
-      }, { merge: true });
+      };
+      const kelasRef = typeof getSemesterDocRef === "function"
+        ? getSemesterDocRef("kelas", item.kelasItem.kelas)
+        : db.collection("kelas").doc(item.kelasItem.kelas);
+      batch.set(kelasRef, payload, { merge: true });
+      localPayloads.push(payload);
     });
     await batch.commit();
+    localPayloads.forEach(upsertLocalKelasCache);
     if (typeof syncWaliKelasTugasTambahan === "function") {
       await syncWaliKelasTugasTambahan();
     }
@@ -1336,20 +1400,24 @@ async function undoAcakWaliKelas() {
   try {
     Swal.fire({ title: "Mengembalikan wali kelas...", didOpen: () => Swal.showLoading(), allowOutsideClick: false });
     const batch = db.batch();
+    const localPayloads = [];
     acakWaliKelasUndo.items.forEach(item => {
       const kelas = semuaDataKelas.find(entry => getStoredKelasParts(entry).kelas === item.kelas);
       if (!kelas) return;
-      const kelasRef = typeof getSemesterDocRef === "function"
-        ? getSemesterDocRef("kelas", kelas.kelas)
-        : db.collection("kelas").doc(kelas.kelas);
-      batch.set(kelasRef, {
+      const payload = {
         ...kelas,
         kode_guru: item.kode_guru || "",
         wali_kelas: item.wali_kelas || "",
         updated_at: new Date()
-      }, { merge: true });
+      };
+      const kelasRef = typeof getSemesterDocRef === "function"
+        ? getSemesterDocRef("kelas", kelas.kelas)
+        : db.collection("kelas").doc(kelas.kelas);
+      batch.set(kelasRef, payload, { merge: true });
+      localPayloads.push(payload);
     });
     await batch.commit();
+    localPayloads.forEach(upsertLocalKelasCache);
     clearAcakWaliUndoSnapshot();
     if (typeof syncWaliKelasTugasTambahan === "function") {
       await syncWaliKelasTugasTambahan();
@@ -1386,12 +1454,15 @@ async function simpanWaliKelasData(namaKelasArg = "", kodeGuruArg = "", options 
       btn.innerText = "Menyimpan...";
     }
 
-    await updateKelas(existing.kelas, {
+    const payload = {
       ...existing,
       kode_guru: kodeGuru,
       wali_kelas: guru ? formatNamaGuru(guru) : "",
       updated_at: new Date()
-    });
+    };
+
+    await updateKelas(existing.kelas, payload);
+    upsertLocalKelasCache(payload);
 
     draftWaliKelasTarget = namaKelas;
     draftKelasWali = kodeGuru;
@@ -1399,6 +1470,7 @@ async function simpanWaliKelasData(namaKelasArg = "", kodeGuruArg = "", options 
     if (typeof syncWaliKelasTugasTambahan === "function") {
       await syncWaliKelasTugasTambahan();
     }
+    renderKelasFiltered();
     if (!options.silent) Swal.fire("Berhasil", "Wali kelas diperbarui", "success");
   } catch (error) {
     console.error(error);
@@ -1445,6 +1517,8 @@ async function saveEditKelas(kelasLama) {
   const tingkatBaru = document.getElementById("editTingkatKelas")?.value || "7";
   const rombelBaru = document.getElementById("editRombelKelas")?.value || "";
   const kelasBaru = buildKelasName(tingkatBaru, rombelBaru);
+  const waliSelect = document.querySelector(".table-edit-row .kelas-inline-wali-select");
+  const kodeGuru = waliSelect?.value || "";
   const validationMessage = validateKelasValues(tingkatBaru, rombelBaru, kelasLama);
 
   if (validationMessage) {
@@ -1452,20 +1526,37 @@ async function saveEditKelas(kelasLama) {
     return;
   }
 
-  const existing = semuaDataKelas.find(item => item.kelas === kelasLama) || {};
+  const waliValidationMessage = kodeGuru ? validateWaliKelasValues(kelasLama, kodeGuru) : "";
+  if (waliValidationMessage) {
+    Swal.fire("Wali kelas belum bisa disimpan", waliValidationMessage, "warning");
+    return;
+  }
+
+  const existing = semuaDataKelas.find(item => getStoredKelasParts(item).kelas === kelasLama || item.kelas === kelasLama) || {};
+  const guru = kodeGuru ? daftarGuruKelas.find(item => String(item.kode_guru || "").trim() === kodeGuru) : null;
 
   try {
-    await updateKelas(kelasLama, {
+    const payload = {
       ...existing,
       tingkat: tingkatBaru,
       rombel: rombelBaru,
       kelas: kelasBaru,
+      kode_guru: kodeGuru,
+      wali_kelas: guru ? formatNamaGuru(guru) : "",
       updated_at: new Date()
-    });
+    };
+
+    await updateKelas(kelasLama, payload);
+    if (kelasLama !== kelasBaru) removeLocalKelasCache(kelasLama);
+    upsertLocalKelasCache(payload);
 
     currentEditKelas = null;
     if (draftWaliKelasTarget === kelasLama) {
       draftWaliKelasTarget = kelasBaru;
+    }
+    draftKelasWali = kodeGuru;
+    if (typeof syncWaliKelasTugasTambahan === "function") {
+      await syncWaliKelasTugasTambahan();
     }
     renderKelasFiltered();
     if (typeof showInlineSaveNotificationForData === "function") {
@@ -1492,9 +1583,11 @@ async function hapusKelas(namaKelas) {
 
   try {
     await deleteKelas(namaKelas);
+    removeLocalKelasCache(namaKelas);
     if (currentEditKelas === namaKelas) {
       currentEditKelas = null;
     }
+    renderKelasFiltered();
     Swal.fire("Berhasil", "Data kelas dihapus", "success");
   } catch (error) {
     console.error(error);

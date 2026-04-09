@@ -42,6 +42,36 @@
       background: #fff;
     }
 
+    .password-field {
+      position: relative;
+      margin-bottom: 15px;
+    }
+
+    .password-field input {
+      margin-bottom: 0;
+      padding-right: 76px;
+    }
+
+    .password-toggle {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      transform: translateY(-50%);
+      width: auto;
+      min-width: 58px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      background: #e5eefc;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .password-toggle:hover {
+      background: #dbe7ff;
+    }
+
     button {
       width: 100%;
       padding: 10px;
@@ -73,7 +103,10 @@
     <option value="">Memuat semester...</option>
   </select>
   <input type="text" id="username" placeholder="Username">
-  <input type="password" id="password" placeholder="Password">
+  <div class="password-field">
+    <input type="password" id="password" placeholder="Password">
+    <button type="button" id="togglePasswordBtn" class="password-toggle" onclick="togglePasswordVisibility()">Lihat</button>
+  </div>
   <button onclick="login()">Masuk</button>
 
   <div class="error" id="error">Username atau password salah</div>
@@ -141,6 +174,16 @@
   function getSelectedLoginSemester() {
     const id = document.getElementById("semesterLogin").value || "legacy";
     return daftarSemesterLogin.find(item => item.id === id) || makeDefaultLoginSemester();
+  }
+
+  function togglePasswordVisibility() {
+    const passwordInput = document.getElementById("password");
+    const toggleBtn = document.getElementById("togglePasswordBtn");
+    if (!passwordInput || !toggleBtn) return;
+    const isHidden = passwordInput.type === "password";
+    passwordInput.type = isHidden ? "text" : "password";
+    toggleBtn.innerText = isHidden ? "Sembunyi" : "Lihat";
+    toggleBtn.setAttribute("aria-label", isHidden ? "Sembunyikan password" : "Lihat password");
   }
 
   async function login() {
